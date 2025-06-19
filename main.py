@@ -29,10 +29,12 @@ try:
     genai.configure(api_key=GEMINI_API_KEY)
     modelo = genai.GenerativeModel("gemini-1.5-flash")
     
-    # Verificación temprana de conexión
+    # Verificación temprana de conexión (sin timeout)
     async def verify_gemini():
         try:
-            await modelo.generate_content_async("Test connection", timeout=10)
+            response = await modelo.generate_content_async("Test connection")
+            if not response.text:
+                raise ValueError("Respuesta vacía de Gemini")
             logger.info("Conexión con Gemini verificada")
             return True
         except Exception as e:
@@ -42,7 +44,7 @@ try:
     asyncio.create_task(verify_gemini())
     
 except Exception as e:
-    logger.error(f"Error crítico al configurar Gemini: {str(e)}")
+    logger.error(f"Error configurando Gemini: {str(e)}")
     modelo = None
 
 # Inicialización de Firebase con manejo mejorado de errores
@@ -78,7 +80,7 @@ except Exception:
 app = FastAPI(
     title="API Coprodelito",
     description="Asistente emocional para estudiantes",
-    version="2.0",
+    version="2.1",
     docs_url="/docs",
     redoc_url=None,
     openapi_url="/openapi.json"
@@ -167,17 +169,17 @@ async def register(user: UserRequest):
         password = user.password.strip()
         
         if len(password) != 8:
-            raise HTTPException(400, "La contraseña debe tener 8 caracteres")
+            raise HTTPException(400, detail="La contraseña debe tener 8 caracteres")
         
         if not db:
-            raise HTTPException(500, "Error de base de datos")
+            raise HTTPException(500, detail="Error de base de datos")
         
         users_ref = db.collection("students")
         query = users_ref.where("email", "==", email).limit(1)
-        docs = await query.get()
+        docs = query.get()
         
         if docs:
-            raise HTTPException(400, "El correo ya está registrado")
+            raise HTTPException(400, detail="El correo ya está registrado")
         
         await users_ref.add({
             "email": email,
@@ -188,10 +190,10 @@ async def register(user: UserRequest):
         return {"success": True, "email": email}
         
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, detail=str(e))
     except Exception as e:
         logger.error(f"Register error: {str(e)}")
-        raise HTTPException(500, "Error en el servidor")
+        raise HTTPException(500, detail="Error en el servidor")
 
 @app.post("/login", response_model=Dict)
 async def login(user: UserRequest):
@@ -200,24 +202,24 @@ async def login(user: UserRequest):
         password = user.password.strip()
         
         if not db:
-            raise HTTPException(500, "Error de base de datos")
+            raise HTTPException(500, detail="Error de base de datos")
         
         users_ref = db.collection("students")
         query = users_ref.where("email", "==", email) \
                         .where("password", "==", password) \
                         .limit(1)
-        docs = await query.get()
+        docs = query.get()
         
         if not docs:
-            raise HTTPException(401, "Credenciales incorrectas")
+            raise HTTPException(401, detail="Credenciales incorrectas")
         
         return {"success": True, "email": email}
         
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, detail=str(e))
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
-        raise HTTPException(500, "Error en el servidor")
+        raise HTTPException(500, detail="Error en el servidor")
 
 @app.post("/welcome", response_model=Dict)
 async def welcome(user: UserRequest):
@@ -235,19 +237,19 @@ async def welcome(user: UserRequest):
         
     except Exception as e:
         logger.error(f"Welcome error: {str(e)}")
-        raise HTTPException(500, "Error al generar bienvenida")
+        raise HTTPException(500, detail="Error al generar bienvenida")
 
 @app.post("/chat", response_model=Dict)
 async def chat(chat_data: ChatRequest):
     try:
         if not modelo:
-            raise HTTPException(503, "Servicio de IA no disponible")
+            raise HTTPException(503, detail="Servicio de IA no disponible")
         
         message = ChatRequest.validate_message(chat_data.message)
         
         async with state.lock:
             if not state.student_email:
-                raise HTTPException(400, "Sesión no iniciada")
+                raise HTTPException(400, detail="Sesión no iniciada")
             
             # Generar respuesta
             response = await generate_response(message)
@@ -257,7 +259,7 @@ async def chat(chat_data: ChatRequest):
         raise
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(500, "Error procesando mensaje")
+        raise HTTPException(500, detail="Error procesando mensaje")
 
 # Funciones auxiliares
 async def generate_response(message: str) -> str:
@@ -284,7 +286,6 @@ Responde de forma empática y natural."""
         
         response = await modelo.generate_content_async(
             prompt,
-            timeout=30,
             safety_settings={
                 "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
                 "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
