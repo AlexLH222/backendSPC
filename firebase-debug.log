@@ -1,0 +1,57 @@
+[debug] [2025-06-17T04:36:29.710Z] ----------------------------------------------------------------------
+[debug] [2025-06-17T04:36:29.712Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\alexx\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2025-06-17T04:36:29.712Z] CLI Version:   14.7.0
+[debug] [2025-06-17T04:36:29.712Z] Platform:      win32
+[debug] [2025-06-17T04:36:29.712Z] Node Version:  v22.12.0
+[debug] [2025-06-17T04:36:29.712Z] Time:          Mon Jun 16 2025 23:36:29 GMT-0500 (hora estándar de Perú)
+[debug] [2025-06-17T04:36:29.712Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-17T04:36:29.717Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-17T04:36:29.717Z] > authorizing via signed-in user (incognify222@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\222\backend_SPC
+
+Before we get started, keep in mind:
+
+  * You are currently outside your home directory
+
+[debug] [2025-06-17T04:48:19.473Z] ----------------------------------------------------------------------
+[debug] [2025-06-17T04:48:19.475Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\alexx\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init functions
+[debug] [2025-06-17T04:48:19.475Z] CLI Version:   14.7.0
+[debug] [2025-06-17T04:48:19.476Z] Platform:      win32
+[debug] [2025-06-17T04:48:19.476Z] Node Version:  v22.12.0
+[debug] [2025-06-17T04:48:19.476Z] Time:          Mon Jun 16 2025 23:48:19 GMT-0500 (hora estándar de Perú)
+[debug] [2025-06-17T04:48:19.476Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-17T04:48:19.480Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-17T04:48:19.480Z] > authorizing via signed-in user (incognify222@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\222\backend_SPC
+
+Before we get started, keep in mind:
+
+  * You are currently outside your home directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] but for now we'll just set up a default project.
+[info] 
