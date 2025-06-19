@@ -21,32 +21,37 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuración de Gemini AI con manejo robusto de errores
+# Reemplaza la configuración de Gemini con:
 try:
     GEMINI_API_KEY = os.getenv("API_KEY")
     if not GEMINI_API_KEY:
-        raise ValueError("API_KEY no está configurada")
+        raise ValueError("API_KEY no configurada")
     
-    genai.configure(api_key=GEMINI_API_KEY)
-    modelo = genai.GenerativeModel("gemini-1.5-flash")
+    # Configuración con timeout global
+    genai.configure(
+        api_key=GEMINI_API_KEY,
+        transport='rest',  # Alternativa si gRPC falla
+        client_options={
+            'api_endpoint': 'https://generativelanguage.googleapis.com'
+        }
+    )
     
-    # Verificación temprana de conexión (sin timeout)
-    async def verify_gemini():
-        try:
-            response = await modelo.generate_content_async("Test connection")
-            if not response.text:
-                raise ValueError("Respuesta vacía de Gemini")
-            logger.info("Conexión con Gemini verificada")
-            return True
-        except Exception as e:
-            logger.error(f"Error verificando Gemini: {str(e)}")
-            return False
+    # Modelo con configuración simplificada
+    modelo = genai.GenerativeModel('gemini-1.5-flash')
     
-    asyncio.create_task(verify_gemini())
-    
-except Exception as e:
-    logger.error(f"Error configurando Gemini: {str(e)}")
-    modelo = None
+    # Verificación con manejo explícito
+    try:
+        response = genai.generate_content("Test")
+        if not response.text:
+            raise ValueError("Respuesta vacía")
+        logger.info("Gemini configurado correctamente")
+    except Exception as e:
+        logger.error(f"Error verificando Gemini: {str(e)}")
+        modelo = None
 
+except Exception as e:
+    logger.error(f"Error crítico: {str(e)}")
+    modelo = None
 # Inicialización de Firebase con manejo mejorado de errores
 def init_firebase():
     try:
@@ -239,27 +244,35 @@ async def welcome(user: UserRequest):
         logger.error(f"Welcome error: {str(e)}")
         raise HTTPException(500, detail="Error al generar bienvenida")
 
-@app.post("/chat", response_model=Dict)
-async def chat(chat_data: ChatRequest):
+@app.post("/chat")
+async def chat_endpoint(chat: ChatRequest):
+    if not modelo:
+        raise HTTPException(
+            status_code=503,
+            detail="Servicio de IA no disponible temporalmente"
+        )
+    
     try:
-        if not modelo:
-            raise HTTPException(503, detail="Servicio de IA no disponible")
+        # Intento principal con timeout manual
+        try:
+            response = await asyncio.wait_for(
+                modelo.generate_content_async(chat.message),
+                timeout=15.0
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(504, "Tiempo de espera agotado con Gemini")
         
-        message = ChatRequest.validate_message(chat_data.message)
+        if not response.text:
+            raise ValueError("Respuesta vacía de Gemini")
+            
+        return {"response": response.text}
         
-        async with state.lock:
-            if not state.student_email:
-                raise HTTPException(400, detail="Sesión no iniciada")
-            
-            # Generar respuesta
-            response = await generate_response(message)
-            return {"response": response}
-            
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(500, detail="Error procesando mensaje")
+        logger.error(f"Error en chat: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando mensaje: {str(e)}"
+        )
 
 # Funciones auxiliares
 async def generate_response(message: str) -> str:
