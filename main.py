@@ -20,39 +20,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configuración de Gemini AI con manejo robusto de errores
-# Reemplaza la configuración de Gemini con:
+# Configuración de Gemini AI corregida
 try:
     GEMINI_API_KEY = os.getenv("API_KEY")
     if not GEMINI_API_KEY:
-        raise ValueError("API_KEY no configurada")
+        raise ValueError("API_KEY no está configurada en las variables de entorno")
     
-    # Configuración con timeout global
+    # Configuración con transporte REST como alternativa
     genai.configure(
         api_key=GEMINI_API_KEY,
-        transport='rest',  # Alternativa si gRPC falla
-        client_options={
-            'api_endpoint': 'https://generativelanguage.googleapis.com'
-        }
+        transport='rest',
+        client_options={'api_endpoint': 'https://generativelanguage.googleapis.com'}
     )
     
-    # Modelo con configuración simplificada
-    modelo = genai.GenerativeModel('gemini-1.5-flash')
+    modelo = genai.GenerativeModel("gemini-1.5-flash")
     
-    # Verificación con manejo explícito
-    try:
-        response = genai.generate_content("Test")
-        if not response.text:
-            raise ValueError("Respuesta vacía")
-        logger.info("Gemini configurado correctamente")
-    except Exception as e:
-        logger.error(f"Error verificando Gemini: {str(e)}")
-        modelo = None
-
+    # Verificación de conexión corregida
+    async def verify_gemini():
+        try:
+            response = await modelo.generate_content_async("Test connection")
+            if not response.text:
+                raise ValueError("Respuesta vacía de Gemini")
+            logger.info("Conexión con Gemini verificada")
+            return True
+        except Exception as e:
+            logger.error(f"Error verificando Gemini: {str(e)}")
+            return False
+    
+    asyncio.create_task(verify_gemini())
+    
 except Exception as e:
-    logger.error(f"Error crítico: {str(e)}")
+    logger.error(f"Error configurando Gemini: {str(e)}")
     modelo = None
-# Inicialización de Firebase con manejo mejorado de errores
+
+# Inicialización de Firebase
 def init_firebase():
     try:
         if not firebase_admin._apps:
@@ -79,13 +80,14 @@ def init_firebase():
 try:
     db = init_firebase()
     logger.info("Firebase inicializado correctamente")
-except Exception:
+except Exception as e:
+    logger.error(f"Error inicializando Firebase: {str(e)}")
     db = None
 
 app = FastAPI(
     title="API Coprodelito",
     description="Asistente emocional para estudiantes",
-    version="2.1",
+    version="2.2",
     docs_url="/docs",
     redoc_url=None,
     openapi_url="/openapi.json"
@@ -174,17 +176,17 @@ async def register(user: UserRequest):
         password = user.password.strip()
         
         if len(password) != 8:
-            raise HTTPException(400, detail="La contraseña debe tener 8 caracteres")
+            raise HTTPException(status_code=400, detail="La contraseña debe tener 8 caracteres")
         
         if not db:
-            raise HTTPException(500, detail="Error de base de datos")
+            raise HTTPException(status_code=500, detail="Error de base de datos")
         
         users_ref = db.collection("students")
         query = users_ref.where("email", "==", email).limit(1)
         docs = query.get()
         
         if docs:
-            raise HTTPException(400, detail="El correo ya está registrado")
+            raise HTTPException(status_code=400, detail="El correo ya está registrado")
         
         await users_ref.add({
             "email": email,
@@ -195,10 +197,10 @@ async def register(user: UserRequest):
         return {"success": True, "email": email}
         
     except ValueError as e:
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Register error: {str(e)}")
-        raise HTTPException(500, detail="Error en el servidor")
+        raise HTTPException(status_code=500, detail="Error en el servidor")
 
 @app.post("/login", response_model=Dict)
 async def login(user: UserRequest):
@@ -207,7 +209,7 @@ async def login(user: UserRequest):
         password = user.password.strip()
         
         if not db:
-            raise HTTPException(500, detail="Error de base de datos")
+            raise HTTPException(status_code=500, detail="Error de base de datos")
         
         users_ref = db.collection("students")
         query = users_ref.where("email", "==", email) \
@@ -216,15 +218,15 @@ async def login(user: UserRequest):
         docs = query.get()
         
         if not docs:
-            raise HTTPException(401, detail="Credenciales incorrectas")
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
         
         return {"success": True, "email": email}
         
     except ValueError as e:
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
-        raise HTTPException(500, detail="Error en el servidor")
+        raise HTTPException(status_code=500, detail="Error en el servidor")
 
 @app.post("/welcome", response_model=Dict)
 async def welcome(user: UserRequest):
@@ -242,37 +244,35 @@ async def welcome(user: UserRequest):
         
     except Exception as e:
         logger.error(f"Welcome error: {str(e)}")
-        raise HTTPException(500, detail="Error al generar bienvenida")
+        raise HTTPException(status_code=500, detail="Error al generar bienvenida")
 
-@app.post("/chat")
-async def chat_endpoint(chat: ChatRequest):
-    if not modelo:
-        raise HTTPException(
-            status_code=503,
-            detail="Servicio de IA no disponible temporalmente"
-        )
-    
+@app.post("/chat", response_model=Dict)
+async def chat(chat_data: ChatRequest):
     try:
-        # Intento principal con timeout manual
-        try:
-            response = await asyncio.wait_for(
-                modelo.generate_content_async(chat.message),
-                timeout=15.0
-            )
-        except asyncio.TimeoutError:
-            raise HTTPException(504, "Tiempo de espera agotado con Gemini")
+        if not modelo:
+            raise HTTPException(status_code=503, detail="Servicio de IA no disponible")
         
-        if not response.text:
-            raise ValueError("Respuesta vacía de Gemini")
+        message = ChatRequest.validate_message(chat_data.message)
+        
+        async with state.lock:
+            if not state.student_email:
+                raise HTTPException(status_code=400, detail="Sesión no iniciada")
             
-        return {"response": response.text}
-        
+            # Generar respuesta con timeout
+            try:
+                response = await asyncio.wait_for(
+                    generate_response(message),
+                    timeout=15.0
+                )
+                return {"response": response}
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=504, detail="Tiempo de espera agotado")
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error en chat: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error procesando mensaje: {str(e)}"
-        )
+        logger.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error procesando mensaje")
 
 # Funciones auxiliares
 async def generate_response(message: str) -> str:
