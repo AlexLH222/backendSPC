@@ -23,6 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuración de Gemini mejorada
+# Configuración CORREGIDA de Gemini
 try:
     API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not API_KEY:
@@ -31,14 +32,20 @@ try:
     
     genai.configure(
         api_key=API_KEY,
-        transport='rest',
+        transport='rest',  # Mantenemos esto para mayor estabilidad
+        # Eliminamos el timeout de client_options
         client_options={
-            'api_endpoint': 'https://generativelanguage.googleapis.com',
-            'timeout': 30
+            'api_endpoint': 'https://generativelanguage.googleapis.com'
         }
     )
     
-    modelo = genai.GenerativeModel("gemini-1.5-flash")
+    modelo = genai.GenerativeModel(
+        "gemini-1.5-flash",
+        generation_config={
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
+    )
     logger.info("Gemini configurado correctamente")
 except Exception as e:
     logger.error(f"Error configurando Gemini: {str(e)}")
